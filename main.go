@@ -390,9 +390,6 @@ func inferWayID(edgeID string) string {
 
 func main() {
 	store := NewMemStore()
-	// pré-popular algumas ways
-	store.UpsertWayMetrics(context.Background(), &WayMetrics{WayID: "wayA", Highway: "primary"})
-	store.UpsertWayMetrics(context.Background(), &WayMetrics{WayID: "wayB", Highway: "residential"})
 
 	// criar algumas edges
 	store.UpsertEdge(context.Background(), &Edge{ID: "wayA_e1", WayID: "wayA", Flow: 0.9, Updated: time.Now()})

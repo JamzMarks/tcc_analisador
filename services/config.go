@@ -7,12 +7,10 @@ import (
 )
 
 type Config struct {
-	DeviceAPI  string
-	RabbitURL  string
-	PollMs     int
-	QueueName  string
-	DeltaRange float64
-	Seed       int64
+	DeviceAPI string
+	RabbitURL string
+	PollMs    int
+	QueueName string
 }
 
 func LoadConfig() *Config {
@@ -20,17 +18,13 @@ func LoadConfig() *Config {
 	rabbitURL := flag.String("rabbitmq-url", getenv("RABBITMQ_URL", "amqp://guest:guest@localhost:5672/"), "RabbitMQ connection URL")
 	pollMs := flag.Int("poll-ms", atoiDefault(getenv("POLL_MS", "30000"), 30000), "Polling interval")
 	queue := flag.String("queue", getenv("QUEUE_NAME", "injector_queue"), "RabbitMQ queue name")
-	delta := flag.Float64("delta-range", atofDefault(getenv("DELTA_RANGE", "0.09"), 0.09), "Max delta per tick")
-	seed := flag.Int64("seed", atoi64Default(getenv("RANDOM_SEED", "0"), 0), "Random seed (0 = time-based)")
 	flag.Parse()
 
 	return &Config{
-		DeviceAPI:  *deviceAPI,
-		RabbitURL:  *rabbitURL,
-		PollMs:     *pollMs,
-		QueueName:  *queue,
-		DeltaRange: *delta,
-		Seed:       *seed,
+		DeviceAPI: *deviceAPI,
+		RabbitURL: *rabbitURL,
+		PollMs:    *pollMs,
+		QueueName: *queue,
 	}
 }
 
