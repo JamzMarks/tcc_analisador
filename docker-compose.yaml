@@ -1,0 +1,16 @@
+services:
+  injector:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: analisador
+    environment:
+      - PORT=${PORT}
+      - AMQP_URL=${AMQP_URL}
+      - QUEUE_NAME=${QUEUE_NAME}
+      - GRAPH_DB_URI=${GRAPH_DB_URI}
+      - GRAPH_DB_USERNAME=${GRAPH_DB_USERNAME}
+      - GRAPH_DB_PASSWORD=${GRAPH_DB_PASSWORD}
+    ports:
+      - "${PORT}:${PORT}"
+    restart: unless-stopped
