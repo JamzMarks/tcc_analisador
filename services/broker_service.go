@@ -1,7 +1,9 @@
 package services
 
 import (
+	"context"
 	"log"
+	"time"
 
 	amqp "github.com/rabbitmq/amqp091-go"
 )
@@ -26,11 +28,11 @@ func NewRabbitService(amqpURL, queueName string) (*RabbitService, error) {
 
 	_, err = ch.QueueDeclare(
 		queueName,
-		true,  // durable
-		false, // autoDelete
-		false, // exclusive
-		false, // noWait
-		nil,   // args
+		true,
+		false,
+		false,
+		false,
+		nil,
 	)
 	if err != nil {
 		ch.Close()
@@ -45,7 +47,29 @@ func NewRabbitService(amqpURL, queueName string) (*RabbitService, error) {
 	}, nil
 }
 
-// Close fecha a conexão e o canal
+func (r *RabbitService) Publish(body []byte) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	err := r.channel.PublishWithContext(ctx,
+		"",
+		r.queue,
+		false,
+		false,
+		amqp.Publishing{
+			ContentType:  "application/json",
+			Body:         body,
+			DeliveryMode: amqp.Persistent,
+		},
+	)
+	if err != nil {
+		return err
+	}
+
+	log.Printf("[RabbitMQ] Mensagem publicada na fila '%s' (%d bytes)", r.queue, len(body))
+	return nil
+}
+
 func (r *RabbitService) Close() {
 	if r.channel != nil {
 		r.channel.Close()
@@ -53,30 +77,4 @@ func (r *RabbitService) Close() {
 	if r.conn != nil {
 		r.conn.Close()
 	}
-}
-
-// Consume inicia o consumo de mensagens
-func (r *RabbitService) Consume(handler func(body []byte) error) error {
-	msgs, err := r.channel.Consume(
-		r.queue,
-		"",    // consumer
-		false, // autoAck
-		false, // exclusive
-		false, // noLocal
-		false, // noWait
-		nil,   // args
-	)
-	if err != nil {
-		return err
-	}
-
-	go func() {
-		for msg := range msgs {
-			if err := handler(msg.Body); err != nil {
-				log.Printf("Erro ao processar mensagem: %v", err)
-			}
-		}
-	}()
-
-	return nil
 }

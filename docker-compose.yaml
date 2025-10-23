@@ -1,5 +1,5 @@
 services:
-  injector:
+  analisador:
     build:
       context: .
       dockerfile: Dockerfile
