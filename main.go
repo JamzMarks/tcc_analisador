@@ -1,43 +1,32 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
-	"os"
 	"tcc_analisador/services"
 	"time"
 )
 
 func main() {
-	amqpURL := os.Getenv("AMQP_URL")
-	queueName := os.Getenv("QUEUE_NAME")
-	if amqpURL == "" || queueName == "" {
-		log.Fatal("Variáveis de ambiente do broker não configuradas")
-	}
-
-	uri := os.Getenv("GRAPH_DB_URI")
-	username := os.Getenv("GRAPH_DB_USERNAME")
-	password := os.Getenv("GRAPH_DB_PASSWORD")
-	if uri == "" || username == "" || password == "" {
-		log.Fatal("Variáveis de ambiente do banco de grafos não configuradas")
-	}
+	cfg := services.LoadConfig()
 
 	fmt.Print("ok")
 	// Neo4j
-	analyser := services.NewGraphService(uri, username, password)
+	analyser := services.NewGraphService(cfg.GraphDBURI, cfg.GraphDBUser, cfg.GraphDBPass)
 	defer analyser.Close()
 	analyser.TestConnection()
 
 	// RabbitMQ
-	rabbit, err := services.NewRabbitService(amqpURL, queueName)
+	rabbit, err := services.NewRabbitService(cfg.RabbitURL)
 	if err != nil {
 		log.Fatalf("Erro ao conectar RabbitMQ: %v", err)
 	}
 	defer rabbit.Close()
-	log.Printf("Escutando fila: %s no RabbitMQ: %s", queueName, amqpURL)
+	log.Printf("Escutando fila: %s no RabbitMQ: %s", cfg.QueueName, cfg.RabbitURL)
 
-	// Ticker para análise a cada 30 segundos
-	ticker := time.NewTicker(30 * time.Second)
+	// Ticker para análise a cada 45 segundos
+	ticker := time.NewTicker(45 * time.Second)
 	defer ticker.Stop()
 
 	for {
@@ -51,21 +40,38 @@ func main() {
 			}
 			log.Printf("Análise concluída para %d vias", len(ways))
 
+			timestamp := time.Now().Unix()
+			// marshal para JSON
+			msgRabbit, err := json.Marshal(struct {
+				Timestamp int64 `json:"timestamp"`
+			}{
+				Timestamp: timestamp,
+			})
+			if err != nil {
+				fmt.Printf("[ERRO Marshal] %v\n", err)
+				return
+			}
+			// Routing key: signal.update.<deviceID>
+			rk := "analysis.completed"
+			if err := rabbit.Publish("analysis.events", rk, msgRabbit); err != nil {
+				fmt.Printf("[ERRO Rabbit]: %v\n", err)
+
+				// Telemetria opcional
+				// telemetry := types.TelemetryError{
+				// 	DeviceID:  deviceID,
+				// 	Payload:   msgRabbit,
+				// 	ErrorMsg:  "Rabbit publish failed",
+				// 	Timestamp: time.Now(),
+				// 	Module:    "orquestrator",
+				// 	Event:     "Publish message to Rabbit",
+				// }
+				// msgFail, _ := json.Marshal(telemetry)
+				// mq.Publish("telemetry.events", "telemetry.signal.fail", msgFail)
+			}
 		default:
 			log.Printf("algo")
 			time.Sleep(30000 * time.Millisecond)
-			// // Processa mensagens do RabbitMQ se houver
-			// msg, ok := rabbit.GetMessageNonBlocking()
-			// if ok {
-			// 	// Aqui você processa a mensagem
-			// 	err := processMessage(msg, analyser)
-			// 	if err != nil {
-			// 		log.Printf("Erro ao processar mensagem: %v", err)
-			// 	}
-			// } else {
-			// 	// Pequena pausa para não travar CPU
-			// 	time.Sleep(100 * time.Millisecond)
-			// }
+
 		}
 	}
 }

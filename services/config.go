@@ -19,7 +19,7 @@ type Config struct {
 
 func LoadConfig() *Config {
 	deviceAPI := flag.String("device-api-url", getenv("DEVICE_API_URL", "http://host.docker.internal:3005/api/v1/camera"), "URL to fetch devices")
-	rabbitURL := flag.String("rabbitmq-url", getenv("RABBITMQ_URL", "amqp://guest:guest@localhost:5672/"), "RabbitMQ connection URL")
+	rabbitURL := flag.String("rabbitmq-url", getenv("AMQP_URL", "amqp://user:pass@host.docker.internal:5672/"), "RabbitMQ connection URL")
 	pollMs := flag.Int("poll-ms", atoiDefault(getenv("POLL_MS", "30000"), 30000), "Polling interval")
 	queue := flag.String("queue", getenv("QUEUE_NAME", "injector_queue"), "RabbitMQ queue name")
 
