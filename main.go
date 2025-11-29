@@ -69,8 +69,7 @@ func main() {
 				// mq.Publish("telemetry.events", "telemetry.signal.fail", msgFail)
 			}
 		default:
-			log.Printf("algo")
-			time.Sleep(30000 * time.Millisecond)
+			time.Sleep(60 * time.Second)
 
 		}
 	}
