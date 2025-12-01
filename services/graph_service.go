@@ -60,12 +60,12 @@ func (s *AnalisadorService) AnalyzeWays() ([]types.WayFlowResult, error) {
 	defer session.Close(ctx)
 
 	query := `
-		MATCH (d:Device)-[:FEED_DATA_ON]->(w:OSMWay)
-		RETURN 
-			elementId(w) AS wayId,
-			w.highway AS roadType,
-			round(avg(d.flow * d.confiability), 5) AS avgFlowByReliability
-	`
+        MATCH (d:Device)-[:FEED_DATA_ON]->(w:OSMWay)
+        RETURN 
+            elementId(w) AS wayId,
+            w.highway AS roadType,
+            round(avg(d.flow * d.confiability), 5) AS avgFlowByReliability
+    `
 
 	result, err := session.Run(ctx, query, nil)
 	if err != nil {
@@ -80,9 +80,14 @@ func (s *AnalisadorService) AnalyzeWays() ([]types.WayFlowResult, error) {
 		roadType := record.Values[1].(string)
 		avgFlow := record.Values[2].(float64)
 
-		priority := types.GetRoadPriority(roadType)
-		normalizedFlow := avgFlow * priority
+		// prioridade base da via
+		basePriority := types.GetRoadPriority(roadType)
+
+		// normalização única correta
+		normalizedFlow := avgFlow * basePriority
+
 		log.Printf("Valor normalizado: %.5f", normalizedFlow)
+
 		ways = append(ways, types.WayFlowResult{
 			WayID:                wayID,
 			RoadType:             roadType,
@@ -94,22 +99,35 @@ func (s *AnalisadorService) AnalyzeWays() ([]types.WayFlowResult, error) {
 		return nil, fmt.Errorf("erro ao ler resultados: %w", err)
 	}
 
+	// -------- NORMALIZAÇÃO FINAL --------
 	waysData := make([]map[string]any, len(ways))
 	for i, way := range ways {
-		rawPriority := types.GetRoadPriority(way.RoadType) * way.AvgFlowByReliability * 100
-		priority := math.Round(rawPriority*100) / 100
+
+		// clamp para manter 0..1
+		value := way.AvgFlowByReliability
+		if value < 0 {
+			value = 0
+		}
+		if value > 1 {
+			value = 1
+		}
+
+		// arredonda para 0.000
+		priority := math.Round(value*1000) / 1000
+
 		waysData[i] = map[string]any{
 			"wayId":    way.WayID,
 			"priority": priority,
 		}
 	}
 
+	// atualiza no Neo4j
 	_, err = session.Run(ctx, `
-		UNWIND $ways AS w
-		MATCH (way:OSMWay)
-		WHERE elementId(way) = w.wayId
-		SET way.priority = w.priority
-	`, map[string]any{
+        UNWIND $ways AS w
+        MATCH (way:OSMWay)
+        WHERE elementId(way) = w.wayId
+        SET way.priority = w.priority
+    `, map[string]any{
 		"ways": waysData,
 	})
 	if err != nil {
